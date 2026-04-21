@@ -1,0 +1,23 @@
+# 仮想環境
+venv/
+.venv/
+env/
+
+# 秘密情報
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# OS / エディタ
+Thumbs.db
+.DS_Store
