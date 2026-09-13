@@ -11,7 +11,7 @@
   <link rel="icon" href="{{ url_for('static', filename='icon.svg') }}" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon.svg') }}" />
   <title>音声入力 → Notion</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=10" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=12" />
 </head>
 <body>
   <main class="wrap">
@@ -19,14 +19,14 @@
     <p class="sub">ボタンを押して話し、もう一度押すと文字になります。パソコンの電源は不要です。</p>
 
     <p id="phone-help" class="banner warn hidden" role="status"></p>
-    <p id="homescreen-hint" class="banner hint-banner">Chrome のメニュー →「ホーム画面に追加」で、次からワンタップで開けます。</p>
+    <p id="homescreen-hint" class="banner hint-banner">パスワードは一度保存すれば、このスマホでは次回から不要です。ホーム画面のアイコンは、同じページを開く近道です。</p>
 
     {% if secret_required %}
-    <details id="secret-box" class="secret-box" open>
+    <details id="secret-box" class="secret-box">
       <summary>接続用パスワード</summary>
-      <p class="secret-help">クラウド公開時に決めたパスワードです。このスマホのブラウザにだけ残します。</p>
+      <p class="secret-help">Render で決めた接続用パスワードです。一度保存すれば、タブを閉じてもこのスマホに残ります。</p>
       <label class="label" for="remote-secret">パスワード</label>
-      <input id="remote-secret" type="password" autocomplete="current-password" />
+      <input id="remote-secret" type="password" name="voice-shared-secret" autocomplete="off" />
       <button id="secret-save" type="button" class="btn btn-secondary">この端末に保存</button>
     </details>
     {% endif %}
@@ -43,6 +43,6 @@
 
     <p id="status" class="status" role="status" aria-live="polite"></p>
   </main>
-  <script src="{{ url_for('static', filename='app.js') }}?v=10"></script>
+  <script src="{{ url_for('static', filename='app.js') }}?v=12"></script>
 </body>
 </html>

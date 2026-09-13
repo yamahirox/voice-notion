@@ -33,11 +33,39 @@
     return Boolean(SpeechRecognition) && window.isSecureContext && !isIOS();
   }
 
+  function readSecret() {
+    const stored = localStorage.getItem(SECRET_KEY);
+    if (stored) return stored;
+    const legacy = sessionStorage.getItem(SECRET_KEY);
+    if (legacy) {
+      localStorage.setItem(SECRET_KEY, legacy);
+      sessionStorage.removeItem(SECRET_KEY);
+      return legacy;
+    }
+    return "";
+  }
+
+  function writeSecret(value) {
+    if (value) localStorage.setItem(SECRET_KEY, value);
+    else localStorage.removeItem(SECRET_KEY);
+    sessionStorage.removeItem(SECRET_KEY);
+  }
+
   function secretHeaders() {
     const headers = {};
-    const secret = sessionStorage.getItem(SECRET_KEY);
+    const secret = readSecret();
     if (secret) headers["X-Voice-Secret"] = secret;
     return headers;
+  }
+
+  function refreshSecretBox() {
+    if (!secretBox) return;
+    const saved = Boolean(readSecret());
+    const summary = secretBox.querySelector("summary");
+    if (summary) {
+      summary.textContent = saved ? "接続用パスワード（この端末に保存済み）" : "接続用パスワード";
+    }
+    secretBox.open = !saved;
   }
 
   function buildApiHeaders() {
@@ -386,18 +414,20 @@
 
   secretSaveBtn?.addEventListener("click", () => {
     const value = (remoteSecretEl && remoteSecretEl.value ? remoteSecretEl.value : "").trim();
-    if (value) sessionStorage.setItem(SECRET_KEY, value);
-    else sessionStorage.removeItem(SECRET_KEY);
+    writeSecret(value);
     if (remoteSecretEl) remoteSecretEl.value = "";
-    setStatus(value ? "✅ この端末にパスワードを保存しました" : "パスワードを消しました", value ? "ok" : "");
+    refreshSecretBox();
+    setStatus(value ? "✅ この端末にパスワードを保存しました。次回から入力は不要です" : "パスワードを消しました", value ? "ok" : "");
   });
+
+  refreshSecretBox();
 
   fetch("/api/config")
     .then((res) => res.json())
     .then((cfg) => {
       if (cfg && cfg.secret_required && secretBox) {
         secretBox.classList.remove("hidden");
-        secretBox.open = true;
+        refreshSecretBox();
       }
     })
     .catch(() => {});
