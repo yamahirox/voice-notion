@@ -1,0 +1,19 @@
+{
+  "name": "音声 → Notion",
+  "short_name": "音声Notion",
+  "description": "音声で Notion タスクを追加",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0f1419",
+  "theme_color": "#2563eb",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "/static/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

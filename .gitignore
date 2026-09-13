@@ -21,3 +21,6 @@ __pycache__/
 # OS / エディタ
 Thumbs.db
 .DS_Store
+
+# 開発用自己署名証明書
+certs/

@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#2563eb" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="音声Notion" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/static/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/static/icon.svg" />
+  <title>音声 → Notion</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #0f1419;
+      --card: #1a2332;
+      --text: #e7ecf3;
+      --muted: #8b98a8;
+      --accent: #5b9cf5;
+      --danger: #f07178;
+      --ok: #7fd99a;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f4f6f9;
+        --card: #fff;
+        --text: #1c2530;
+        --muted: #5c6b7a;
+        --accent: #2563eb;
+        --danger: #dc2626;
+        --ok: #15803d;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, "Segoe UI", "Hiragino Sans", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    main {
+      max-width: 560px;
+      margin: 0 auto;
+      padding: 1.5rem 1rem 3rem;
+    }
+    h1 { font-size: 1.35rem; margin: 0 0 1rem; font-weight: 650; }
+    .speech-help-tabs {
+      margin-top: 0.75rem;
+    }
+    .speech-help-tabs .sht-inp {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+      margin: 0;
+    }
+    .speech-help-tabs .sht-labels {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-top: 0.5rem;
+    }
+    .speech-help-tabs .sht-labels label {
+      cursor: pointer;
+      padding: 0.35rem 0.65rem;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      background: rgba(127, 127, 127, 0.2);
+      color: var(--muted);
+      border: 1px solid transparent;
+    }
+    .speech-help-tabs .sht-panel {
+      display: none;
+      margin-top: 0.75rem;
+      padding: 0.6rem 0.65rem;
+      border-radius: 10px;
+      background: rgba(127, 127, 127, 0.08);
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 0.86rem;
+    }
+    .speech-help-tabs .sht-panel p { margin: 0; }
+    #sht1:checked ~ .sht-labels label[for="sht1"],
+    #sht2:checked ~ .sht-labels label[for="sht2"],
+    #sht3:checked ~ .sht-labels label[for="sht3"],
+    #sht4:checked ~ .sht-labels label[for="sht4"] {
+      background: var(--accent);
+      color: #fff;
+      border-color: transparent;
+    }
+    #sht1:checked ~ .sht-p1,
+    #sht2:checked ~ .sht-p2,
+    #sht3:checked ~ .sht-p3,
+    #sht4:checked ~ .sht-p4 {
+      display: block;
+    }
+    .card {
+      background: var(--card);
+      border-radius: 14px;
+      padding: 1rem 1rem 1.1rem;
+      box-shadow: 0 8px 30px rgba(0,0,0,.12);
+    }
+    label { display: block; font-size: 0.82rem; color: var(--muted); margin-bottom: 0.35rem; }
+    textarea {
+      width: 100%;
+      min-height: 120px;
+      resize: vertical;
+      border-radius: 10px;
+      border: 1px solid rgba(127,127,127,.25);
+      padding: 0.65rem 0.75rem;
+      font-size: 1rem;
+      background: transparent;
+      color: inherit;
+    }
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.85rem;
+      align-items: center;
+    }
+    button {
+      appearance: none;
+      border: none;
+      border-radius: 999px;
+      padding: 0.55rem 1.1rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      color: #fff;
+      background: var(--accent);
+    }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    button.secondary { background: rgba(127,127,127,.35); color: var(--text); }
+    button.danger { background: var(--danger); }
+    .status {
+      margin-top: 0.85rem;
+      font-size: 0.88rem;
+      color: var(--muted);
+      min-height: 1.5em;
+      white-space: pre-wrap;
+    }
+    .status.ok { color: var(--ok); }
+    .status.err { color: var(--danger); }
+    .status.busy {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+      border-radius: 8px;
+      padding: 0.35rem 0.5rem;
+    }
+    .hint { margin-top: 1rem; font-size: 0.8rem; color: var(--muted); }
+    details.mobile-how {
+      margin-top: 1.25rem;
+      padding: 0.75rem 1rem;
+      border-radius: 12px;
+      background: rgba(127,127,127,.12);
+      font-size: 0.88rem;
+    }
+    details.mobile-how summary { cursor: pointer; font-weight: 600; color: var(--text); }
+    details.mobile-how ol { margin: 0.6rem 0 0 1.1rem; padding: 0; color: var(--muted); }
+    details.mobile-how li { margin: 0.35rem 0; }
+    .warn {
+      margin-top: 0.75rem;
+      padding: 0.65rem 0.75rem;
+      border-radius: 10px;
+      font-size: 0.82rem;
+      background: rgba(240, 113, 120, 0.15);
+      color: var(--danger);
+    }
+    .info {
+      margin-bottom: 1rem;
+      padding: 0.75rem 0.85rem;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      line-height: 1.45;
+      background: rgba(91, 156, 245, 0.18);
+      color: var(--text);
+    }
+    .info strong { color: var(--accent); }
+    code { font-size: 0.85em; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>音声で Notion に転記</h1>
+    <details class="mobile-how">
+      <summary>PC で「話し始める」が動かない・無反応のとき</summary>
+      <div class="speech-help-tabs">
+        <input type="radio" name="speech-help-tab" id="sht1" class="sht-inp" checked />
+        <input type="radio" name="speech-help-tab" id="sht2" class="sht-inp" />
+        <input type="radio" name="speech-help-tab" id="sht3" class="sht-inp" />
+        <input type="radio" name="speech-help-tab" id="sht4" class="sht-inp" />
+        <div class="sht-labels">
+          <label for="sht1">ブラウザ</label>
+          <label for="sht2">ダイアログ</label>
+          <label for="sht3">Windows</label>
+          <label for="sht4">サイト設定</label>
+        </div>
+        <div class="sht-panel sht-p1">
+          <p><strong>Google Chrome</strong> または <strong>Microsoft Edge</strong>（PC にインストールしたもの）で <code>http://127.0.0.1:8765/</code> を開いてください。<strong>Cursor / VS Code の内蔵プレビュー（Simple Browser）</strong>では、Web Speech API が無効でマイクが動かないことがあります。</p>
+        </div>
+        <div class="sht-panel sht-p2">
+          <p><strong>「話し始める」</strong>のあとダイアログが<strong>出ない</strong>とき: すでにマイク<strong>許可</strong>済みなら出ません（そのまま「聞いています…」）。一方、一度<strong>ブロック</strong>するとダイアログは出ないまま失敗します。アドレスバー左の<strong>鍵／i</strong> → マイクを<strong>許可</strong>に直してください。</p>
+        </div>
+        <div class="sht-panel sht-p3">
+          <p>Windows の<strong>設定 → プライバシーとセキュリティ → マイク</strong>でマイクアクセスがオンか確認してください。</p>
+        </div>
+        <div class="sht-panel sht-p4">
+          <p>アドレスバーの<strong>鍵・︙</strong>から、このサイトの<strong>マイク</strong>が「許可」になっているか確認してください。</p>
+        </div>
+      </div>
+    </details>
+    <div class="info" id="keyboardVoiceHint" hidden>
+      <strong>この開き方（例: http://192.168…）のスマホ：</strong>入力欄をタップ → キーボードの<strong>マイク</strong>で話す → 内容を確認して<strong>Notion に送る</strong>。PC の <code>127.0.0.1</code> なら「話し始める」が使えます。
+    </div>
+    <div class="card">
+      <label for="t">認識テキスト（1行目がタスク名。本文に「明日」「来週」などがあると期日を付けます）</label>
+      <textarea id="t" enterkeyhint="done" inputmode="text" placeholder="例：牛乳を買う&#10;明日"></textarea>
+      <div class="row">
+        <button type="button" id="rec">話し始める</button>
+        <button type="button" id="stop" class="secondary" disabled>停止</button>
+        <button type="button" id="send">Notion に送る</button>
+      </div>
+      <div class="status" id="st" role="status" aria-live="polite" aria-atomic="true"></div>
+    </div>
+    <p class="hint">PC で見る場合: サーバ起動中に <code>http://127.0.0.1:8765</code> を開く（ファイル直開き不可）。<a href="/idea-city" target="_blank" rel="noopener noreferrer">Idea City（複数行・別タブ）</a> ・ <a href="/notebook" target="_blank" rel="noopener noreferrer">Notion ソース Q&amp;A</a></p>
+    <details class="mobile-how">
+      <summary>スマホに「ボタン」を用意する（ホーム画面に追加）</summary>
+      <ol>
+        <li>PC とスマホを<strong>同じ Wi‑Fi</strong> にします。</li>
+        <li>PC で <code>ipconfig</code>（PowerShell/CMD）し、<strong>IPv4 アドレス</strong>（例: <code>192.168.x.x</code>）を控えます。</li>
+        <li>PC で次を実行してサーバを立ち上げます:<br /><code>python -m uvicorn sandbox.app.voice_server:app --host 0.0.0.0 --port 8765</code></li>
+        <li>スマホのブラウザで <code>http://（控えたIP）:8765</code> を開きます。</li>
+        <li><strong>iPhone（Safari）</strong>: 共有 → <strong>ホーム画面に追加</strong>。<strong>Android（Chrome）</strong>: メニュー → <strong>ホーム画面に追加</strong> / ショートカット。</li>
+      </ol>
+    </details>
+    <details class="mobile-how">
+      <summary>インターネットの URL（クラウド）で外からいつでも使う</summary>
+      <ol>
+        <li><strong>Railway</strong>・<strong>Render</strong>・<strong>Fly.io</strong> などに、このフォルダの <code>Dockerfile</code> でデプロイし常時起動させます。</li>
+        <li>ホストの環境変数に <code>NOTION_API_KEY</code> と <code>NOTION_DATABASE_ID</code> を必ず設定します。</li>
+        <li>悪用防止のため <code>VOICE_SHARED_SECRET</code>（20文字以上のランダム）を<strong>強く推奨</strong>します。</li>
+        <li>発行された <strong>https://…</strong> をスマホで開き、下に<strong>同じパスワード</strong>を入れて保存してください（端末のブラウザにだけ残ります）。</li>
+      </ol>
+      <label for="remoteSecret">接続用パスワード（任意・サーバの VOICE_SHARED_SECRET と同じ）</label>
+      <input type="password" id="remoteSecret" name="voice_remote_pw" autocomplete="new-password"
+        style="width:100%;margin:0.35rem 0 0.5rem;padding:0.55rem 0.65rem;border-radius:10px;border:1px solid rgba(127,127,127,.35);background:transparent;color:inherit;font-size:1rem;" />
+      <div class="row" style="margin-top:0;">
+        <button type="button" id="remoteSecretSave" class="secondary">保存</button>
+        <button type="button" id="remoteSecretClear" class="secondary">この端末で消去</button>
+      </div>
+    </details>
+    <div class="warn" id="lanSpeechWarn" hidden>
+      ご家庭の Wi‑Fi の <code>http://192.168…</code> では、ブラウザの「話し始める」は多くのスマホで使えません（Chrome の仕様）。<strong>入力欄</strong>をタップし、<strong>Gboard のマイク</strong>で話してください。PC の <code>127.0.0.1</code> では「話し始める」が使えます。
+    </div>
+  </main>
+  <script>
+    const ta = document.getElementById("t");
+    const st = document.getElementById("st");
+    const btnRec = document.getElementById("rec");
+    const btnStop = document.getElementById("stop");
+    const btnSend = document.getElementById("send");
+    const remoteSecretEl = document.getElementById("remoteSecret");
+    const VOICE_SECRET_KEY = "voiceSharedSecret";
+
+    function setStatus(msg, cls) {
+      if (!st) return;
+      st.textContent = msg || "";
+      st.className = "status" + (cls ? " " + cls : "");
+    }
+
+    function buildApiHeaders() {
+      const h = { "Content-Type": "application/json" };
+      const s = sessionStorage.getItem(VOICE_SECRET_KEY);
+      if (s) h["X-Voice-Secret"] = s;
+      return h;
+    }
+
+    document.getElementById("remoteSecretSave")?.addEventListener("click", () => {
+      const v = (remoteSecretEl && remoteSecretEl.value) ? remoteSecretEl.value.trim() : "";
+      if (v) sessionStorage.setItem(VOICE_SECRET_KEY, v);
+      else sessionStorage.removeItem(VOICE_SECRET_KEY);
+      if (remoteSecretEl) remoteSecretEl.value = "";
+      setStatus(v ? "接続用パスワードをこのブラウザに保存しました。" : "パスワードを消しました。", v ? "ok" : "");
+    });
+    document.getElementById("remoteSecretClear")?.addEventListener("click", () => {
+      sessionStorage.removeItem(VOICE_SECRET_KEY);
+      if (remoteSecretEl) remoteSecretEl.value = "";
+      setStatus("この端末に保存したパスワードを消しました。", "");
+    });
+
+    /** http://192.168.x.x や PC 名の http は isSecureContext=false のため Chrome の SpeechRecognition が無効 */
+    const secureCtx = Boolean(window.isSecureContext);
+    const SpeechRecognitionCtor = window.webkitSpeechRecognition || window.SpeechRecognition;
+    let rec = null;
+    let listening = false;
+    let sessionBase = "";
+    const speechSuggestUrl = "http://127.0.0.1:" + (location.port || "8765") + "/";
+
+    function compactSpeech(text) {
+      return String(text || "").replace(/\s+/g, "");
+    }
+
+    function mergeSpeechChunk(prev, next, breakIfDistinct) {
+      const a = String(prev || "");
+      const b = String(next || "");
+      if (!b) return a;
+      if (!a) return b;
+      const aC = compactSpeech(a);
+      const bC = compactSpeech(b);
+      if (!aC) return b;
+      if (!bC) return a;
+      if (bC === aC) return b.length >= a.length ? b : a;
+      if (bC.startsWith(aC)) return b;
+      if (aC.startsWith(bC)) return a;
+      if (bC.includes(aC)) return b;
+      if (aC.includes(bC)) return a;
+      const max = Math.min(aC.length, bC.length);
+      for (let n = max; n >= 2; n -= 1) {
+        if (aC.endsWith(bC.slice(0, n))) {
+          return aC + bC.slice(n);
+        }
+      }
+      if (breakIfDistinct) {
+        const sep = /\n$/.test(a) || /^\n/.test(b) ? "" : "\n";
+        return a + sep + b;
+      }
+      return a + b;
+    }
+
+    function collapseSpeechStutter(text) {
+      const compact = compactSpeech(text);
+      if (compact.length < 6) return text;
+      for (let len = Math.min(16, Math.floor(compact.length / 2)); len >= 2; len -= 1) {
+        const prefix = compact.slice(0, len);
+        if (compact.slice(len, len * 2) === prefix && compact.length > len * 2) {
+          return collapseSpeechStutter(compact.slice(len));
+        }
+      }
+      return compact === compactSpeech(text) ? text : compact;
+    }
+
+    function heardFromResults(results) {
+      let merged = "";
+      for (let i = 0; i < results.length; i += 1) {
+        merged = mergeSpeechChunk(merged, results[i][0].transcript, false);
+      }
+      return collapseSpeechStutter(merged);
+    }
+
+    function isLanHostname(h) {
+      return /^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(h || "");
+    }
+
+    (function () {
+      const h = location.hostname || "";
+      const isLanHttp = location.protocol === "http:" && isLanHostname(h);
+      if (isLanHttp) {
+        var w = document.getElementById("lanSpeechWarn");
+        if (w) w.hidden = false;
+      }
+      if (!secureCtx) {
+        var hint = document.getElementById("keyboardVoiceHint");
+        if (hint) hint.hidden = false;
+      }
+    })();
+
+    const canUseBrowserSpeech = Boolean(secureCtx && SpeechRecognitionCtor);
+
+    function setSpeechButtonsListening(on) {
+      if (canUseBrowserSpeech) {
+        btnRec.disabled = on;
+        btnStop.disabled = !on;
+      }
+    }
+
+    function createRecognition() {
+      const r = new SpeechRecognitionCtor();
+      r.lang = "ja-JP";
+      r.interimResults = true;
+      r.continuous = true;
+      r.onresult = (ev) => {
+        const heard = heardFromResults(ev.results);
+        ta.value = mergeSpeechChunk(sessionBase, heard, true);
+        const last = ev.results[ev.results.length - 1];
+        const interim = last && !last.isFinal ? last[0].transcript : "";
+        if (interim) setStatus("認識中… " + collapseSpeechStutter(interim));
+        else if (heard) setStatus("取り込みました。送る前に編集できます。");
+      };
+      r.onerror = (ev) => {
+        let extra = "";
+        if (ev.error === "not-allowed") {
+          extra =
+            "\n\n（マイクがブラウザでブロックされています。アドレスバーの鍵・アイコンからこのサイトのマイクを許可してください。）";
+        }
+        if (ev.error === "audio-capture") {
+          extra =
+            "\n\n（マイクを開けませんでした。他アプリの占有を確認し、Windows の設定で既定のマイクを確認してください。）";
+        }
+        if (ev.error === "no-speech") {
+          extra =
+            "\n\n（声が検出されませんでした。マイクに向かって話すか、入力デバイスを確認してください。）";
+        }
+        if (ev.error === "network") {
+          extra =
+            "\n\n（network＝ブラウザが音声認識サービスに繋がれません。インターネット・VPN・ファイアウォールを確認。Cursor の内蔵ブラウザなら Chrome/Edge で開き直してください。Win+H のWindows音声入力も利用できます。）";
+        }
+        setStatus("音声認識エラー: " + ev.error + extra, "err");
+        listening = false;
+        setSpeechButtonsListening(false);
+      };
+      r.onend = () => {
+        listening = false;
+        setSpeechButtonsListening(false);
+      };
+      return r;
+    }
+
+    if (!canUseBrowserSpeech) {
+      btnRec.disabled = true;
+      btnStop.disabled = true;
+      if (!secureCtx) {
+        const h = location.hostname || "";
+        if (isLanHostname(h)) {
+          setStatus(
+            "いまの URL（LAN の http）ではブラウザの「話し始める」は使えません。同じ PC なら次で開き直してください:\n" +
+              speechSuggestUrl +
+              "\n（スマホから LAN で開いている場合は、入力欄＋キーボードのマイクか Win+H も利用できます。）",
+            "err"
+          );
+        } else {
+          setStatus(
+            "ブラウザの音声認識は http://127.0.0.1 または https のときだけ使えます。いま: " +
+              location.host +
+              "\n開き直し: " +
+              speechSuggestUrl,
+            "err"
+          );
+        }
+      } else if (!SpeechRecognitionCtor) {
+        setStatus(
+          "この環境に Web Speech API がありません。Chrome または Edge の通常ウィンドウで開き直してください（Cursor / VS Code のプレビューでは無効なことがあります）。",
+          "err"
+        );
+      }
+    }
+
+    async function ensureMicAccess() {
+      const host = (location.hostname || "").toLowerCase();
+      const isLoopback =
+        host === "127.0.0.1" || host === "localhost" || host === "[::1]";
+
+      if (!isLoopback) {
+        try {
+          if (navigator.permissions && navigator.permissions.query) {
+            const permTimeoutMs = 2500;
+            const perm = await Promise.race([
+              navigator.permissions.query({ name: "microphone" }),
+              new Promise(function (_, rej) {
+                setTimeout(function () {
+                  rej(new Error("PERMISSIONS_QUERY_TIMEOUT"));
+                }, permTimeoutMs);
+              }),
+            ]);
+            if (perm && perm.state === "denied") {
+              return {
+                ok: false,
+                msg:
+                  "マイクが「ブロック」です（再クリックでもダイアログは出ません）。アドレスバーの鍵→マイクを「許可」に。\n" +
+                  "Chrome: chrome://settings/content/siteDetails?site=http%3A%2F%2F127.0.0.1%3A" +
+                  (location.port || "8765"),
+              };
+            }
+          }
+        } catch (ePerm) {
+          if (!(ePerm && ePerm.message === "PERMISSIONS_QUERY_TIMEOUT")) {
+            /* ignore */
+          }
+        }
+      }
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        return { ok: true };
+      }
+
+      var timeoutId;
+      try {
+        var timeoutMs = 20000;
+        var timeoutP = new Promise(function (_, rej) {
+          timeoutId = setTimeout(function () {
+            rej(new Error("MIC_PROMPT_TIMEOUT"));
+          }, timeoutMs);
+        });
+        var stream = await Promise.race([
+          navigator.mediaDevices.getUserMedia({ audio: true }),
+          timeoutP,
+        ]);
+        clearTimeout(timeoutId);
+        stream.getTracks().forEach(function (tr) {
+          tr.stop();
+        });
+        return { ok: true };
+      } catch (e) {
+        clearTimeout(timeoutId);
+        if (e && e.message === "MIC_PROMPT_TIMEOUT") {
+          return {
+            ok: false,
+            msg:
+              "マイク許可の応答がありません（タイムアウト）。背面のダイアログや Windows のマイクプライバシーを確認してください。",
+          };
+        }
+        var n = e && e.name ? e.name : "";
+        if (n === "NotAllowedError" || n === "PermissionDeniedError") {
+          return {
+            ok: false,
+            msg: "マイクが拒否されました。サイトのマイクを許可に変更してください（ブロック中はダイアログが出ません）。",
+          };
+        }
+        return {
+          ok: false,
+          msg:
+            "マイクにアクセスできません（" +
+            (n || "Error") +
+            "）。Windows のマイク設定を確認してください。",
+        };
+      }
+    }
+
+    async function startBrowserListening() {
+      if (!canUseBrowserSpeech || !SpeechRecognitionCtor) {
+        setStatus(
+          "この環境では「話し始める」を実行できません。Chrome / Edge で http://127.0.0.1:8765 を開いてください。",
+          "err"
+        );
+        return;
+      }
+      btnRec.disabled = true;
+      btnStop.disabled = true;
+      if (st) st.classList.add("busy");
+      setStatus("タップを受け付けました。マイクを確認しています…", "");
+      await new Promise(function (resolve) {
+        requestAnimationFrame(function () {
+          requestAnimationFrame(resolve);
+        });
+      });
+      try {
+        const mic = await ensureMicAccess();
+        if (!mic.ok) {
+          setStatus(mic.msg, "err");
+          btnRec.disabled = false;
+          btnStop.disabled = true;
+          if (st) st.classList.remove("busy");
+          return;
+        }
+        if (rec) {
+          try {
+            rec.abort();
+          } catch (_) {}
+          try {
+            rec.stop();
+          } catch (_) {}
+          rec = null;
+        }
+        rec = createRecognition();
+        sessionBase = ta.value || "";
+        rec.start();
+        listening = true;
+        setSpeechButtonsListening(true);
+        setStatus("聞いています…");
+      } catch (e) {
+        setStatus("開始できませんでした: " + e.message, "err");
+        listening = false;
+        btnRec.disabled = false;
+        btnStop.disabled = true;
+      }
+      if (st) st.classList.remove("busy");
+    }
+
+    btnRec.addEventListener("click", function () {
+      startBrowserListening().catch(function (e) {
+        setStatus("想定外エラー: " + (e && e.message ? e.message : String(e)), "err");
+        btnRec.disabled = false;
+        btnStop.disabled = true;
+      });
+    });
+
+    btnStop.addEventListener("click", () => {
+      if (rec) {
+        try {
+          rec.stop();
+        } catch (_) {}
+        try {
+          rec.abort();
+        } catch (_) {}
+      }
+      listening = false;
+      setSpeechButtonsListening(false);
+      setStatus("停止しました。");
+    });
+
+    btnSend.addEventListener("click", async () => {
+      const text = ta.value.trim();
+      if (!text) {
+        setStatus("テキストが空です。", "err");
+        return;
+      }
+      btnSend.disabled = true;
+      setStatus("送信中…");
+      try {
+        const res = await fetch("/api/tasks", {
+          method: "POST",
+          headers: buildApiHeaders(),
+          body: JSON.stringify({ text, dry_run: false }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          let msg = res.statusText || "失敗";
+          if (data.detail) {
+            const d = data.detail;
+            if (typeof d === "string") msg = d;
+            else if (Array.isArray(d) && d[0]?.msg) msg = d.map((x) => x.msg).join("; ");
+            else if (d.detail) msg = typeof d.detail === "string" ? d.detail : JSON.stringify(d.detail);
+          }
+          if (res.status === 401) {
+            msg += " （下の「インターネットの URL」でパスワードを保存したか確認してください）";
+          }
+          setStatus(msg, "err");
+          btnSend.disabled = false;
+          return;
+        }
+        ta.value = "";
+        if (data.skipped) {
+          setStatus("スキップ: " + JSON.stringify(data));
+        } else if (data.url) {
+          setStatus("登録しました。\n" + data.url, "ok");
+        } else {
+          setStatus("完了: " + JSON.stringify(data), "ok");
+        }
+      } catch (e) {
+        setStatus("通信エラー: " + e.message, "err");
+      }
+      btnSend.disabled = false;
+    });
+  </script>
+</body>
+</html>

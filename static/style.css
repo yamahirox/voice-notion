@@ -1,0 +1,185 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  min-height: 100vh;
+  min-height: 100dvh;
+  font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP",
+    "Yu Gothic", Meiryo, system-ui, sans-serif;
+  background: #f3f4f6;
+  color: #111827;
+  line-height: 1.55;
+}
+
+.wrap {
+  width: 100%;
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 1.25rem 1rem calc(2rem + env(safe-area-inset-bottom));
+}
+
+h1 {
+  margin: 0 0 0.35rem;
+  font-size: 1.55rem;
+  font-weight: 700;
+}
+
+.sub {
+  margin: 0 0 1.25rem;
+  color: #4b5563;
+  font-size: 0.95rem;
+}
+
+.label {
+  display: block;
+  margin: 1.1rem 0 0.45rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+textarea {
+  display: block;
+  width: 100%;
+  min-height: 11rem;
+  padding: 0.9rem 1rem;
+  font-size: 1.15rem;
+  line-height: 1.6;
+  border: 2px solid #d1d5db;
+  border-radius: 0.9rem;
+  resize: vertical;
+  background: #fff;
+  color: inherit;
+}
+
+textarea:focus {
+  outline: 3px solid #93c5fd;
+  border-color: #2563eb;
+}
+
+.btn {
+  display: block;
+  width: 100%;
+  min-height: 3.6rem;
+  padding: 0.9rem 1rem;
+  border: none;
+  border-radius: 1rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-mic {
+  background: #2563eb;
+  color: #fff;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.btn-mic.listening {
+  background: #dc2626;
+}
+
+.btn-submit {
+  margin-top: 1.1rem;
+  background: #059669;
+  color: #fff;
+}
+
+.listening {
+  margin: 0.65rem 0 0;
+  text-align: center;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #b91c1c;
+}
+
+.banner {
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.85rem;
+  font-size: 1rem;
+}
+
+.banner.warn {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status {
+  min-height: 1.6rem;
+  margin: 1rem 0 0;
+  text-align: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.status.ok {
+  color: #047857;
+}
+
+.status.err {
+  color: #b91c1c;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.hint-banner {
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+
+.secret-box {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem 1rem;
+  border-radius: 0.85rem;
+  background: #fff;
+  border: 1px solid #d1d5db;
+}
+
+.secret-box summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.secret-help {
+  margin: 0.65rem 0 0;
+  color: #4b5563;
+  font-size: 0.95rem;
+}
+
+.secret-box input {
+  display: block;
+  width: 100%;
+  min-height: 3rem;
+  margin-top: 0.35rem;
+  padding: 0.7rem 0.85rem;
+  font-size: 1.05rem;
+  border: 2px solid #d1d5db;
+  border-radius: 0.75rem;
+}
+
+.btn-secondary {
+  margin-top: 0.75rem;
+  background: #4b5563;
+  color: #fff;
+}

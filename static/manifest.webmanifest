@@ -1,0 +1,19 @@
+{
+  "name": "音声入力 → Notion",
+  "short_name": "音声Notion",
+  "description": "スマホの音声から Notion にタスクを追加",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f3f4f6",
+  "theme_color": "#1d4ed8",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "/static/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

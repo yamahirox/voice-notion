@@ -6,10 +6,12 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterable
 
+from dotenv import load_dotenv
 from notion_client import Client
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+load_dotenv(PROJECT_ROOT / ".env")
 DATA_DIR = PROJECT_ROOT / "sandbox" / "data"
 PROCESSED_PATH = DATA_DIR / "processed.json"
 
@@ -49,7 +51,11 @@ def _require_env(name: str) -> str:
     if not value:
         value = _read_windows_user_env_from_registry(name)
     if not value:
-        raise RuntimeError(f"環境変数 {name} が未設定です。OSの環境変数に設定してください。")
+        raise RuntimeError(
+            f"環境変数 {name} が未設定です。"
+            f"プロジェクト直下の .env に記載するか、OS の環境変数を設定してください。"
+            f"（ひな形: {PROJECT_ROOT / '.env.example'}）"
+        )
     return value
 
 
@@ -193,6 +199,21 @@ def _parse_relative_date_jp(text: str, *, base: date | None = None) -> date | No
     return None
 
 
+def parse_idea_city_tasks(text: str) -> list[tuple[str, date | None]]:
+    """
+    Idea City 用: 改行で複数タスクに分割。各行について相対日付語があれば期日を付与。
+    """
+    out: list[tuple[str, date | None]] = []
+    for raw in (text or "").splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        due = _parse_relative_date_jp(line)
+        title = line if len(line) <= 200 else line[:200]
+        out.append((title, due))
+    return out
+
+
 def _find_first_property_name_by_type(schema: dict, prop_type: str) -> str:
     props = schema.get("properties", {}) or {}
     for name, prop in props.items():
@@ -213,6 +234,92 @@ def _get_property(schema: dict, name: str, expected_type: str | tuple[str, ...])
             f"Notion DBプロパティ {name!r} のtypeが想定と違います: expected={expected!r} actual={actual!r}"
         )
     return prop
+
+
+def _get_notion_context() -> tuple[Client, dict, dict]:
+    """
+    Notion クライアント・親オブジェクト・status プロパティ定義を返す。
+    戻り値: (notion, parent, status_prop)
+    """
+    notion_api_key = _require_env("NOTION_API_KEY")
+    database_id = _require_env("NOTION_DATABASE_ID")
+    notion = Client(auth=notion_api_key)
+
+    db = notion.databases.retrieve(database_id=database_id)
+    if not isinstance(db, dict):
+        raise RuntimeError(f"Notion APIから想定外の応答を受け取りました: {type(db)}")
+
+    parent: dict
+    schema_source: dict = db
+    data_sources = db.get("data_sources") or []
+    if isinstance(data_sources, list) and data_sources and isinstance(data_sources[0], dict) and data_sources[0].get("id"):
+        data_source_id = str(data_sources[0]["id"])
+        schema_source = notion.data_sources.retrieve(data_source_id=data_source_id)
+        parent = {"data_source_id": data_source_id}
+    else:
+        parent = {"database_id": database_id}
+
+    if not isinstance(schema_source, dict):
+        raise RuntimeError(f"Notion APIから想定外の応答を受け取りました: {type(schema_source)}")
+
+    _get_property(schema_source, PROP_TASK_NAME, "title")
+    _get_property(schema_source, PROP_DUE, "date")
+    _get_property(schema_source, PROP_LIFE_IDEA, "multi_select")
+    status_prop = _get_property(schema_source, PROP_STATUS, ("multi_select", "status"))
+    return notion, parent, status_prop
+
+
+def register_notion_task(
+    *,
+    title: str,
+    body: str = "",
+    due: date | None = None,
+    source_id: str = "",
+    dry_run: bool = False,
+    verbose: bool = True,
+) -> dict:
+    """
+    1件 Notion DB に登録する。body は現状ページ本文には使わず API 互換のため保持。
+    戻り値: ok, skipped, page_id, url など
+    """
+    notion, parent, status_prop = _get_notion_context()
+    processed = _load_processed_ids()
+    if source_id and source_id in processed:
+        if verbose:
+            print(f"SKIP: 既に処理済みです source_id={source_id!r}")
+        return {"ok": True, "skipped": True, "source_id": source_id}
+
+    if dry_run:
+        if verbose:
+            print(f"DRYRUN: title={title!r} source_id={source_id!r} due={str(due) if due else ''}")
+        return {"ok": True, "dry_run": True, "title": title, "due": str(due) if due else ""}
+
+    life_idea_value = LIFE_VALUE if due else IDEA_VALUE
+    props: dict = {
+        PROP_TASK_NAME: {"title": [{"type": "text", "text": {"content": title}}]},
+        PROP_LIFE_IDEA: {"multi_select": [{"name": life_idea_value}]},
+    }
+    if status_prop.get("type") == "status":
+        props[PROP_STATUS] = {"status": {"name": STATUS_TODO_VALUE}}
+    else:
+        props[PROP_STATUS] = {"multi_select": [{"name": STATUS_TODO_VALUE}]}
+    if due:
+        props[PROP_DUE] = {"date": {"start": due.isoformat()}}
+
+    page = notion.pages.create(
+        parent=parent,
+        properties=props,
+    )
+    page_id = page.get("id", "")
+    url = page.get("url", "")
+    if verbose:
+        print(f"OK: Notionに1件追加しました title={title!r} id={page_id} url={url}")
+
+    if source_id:
+        processed.add(source_id)
+        _save_processed_ids(processed)
+
+    return {"ok": True, "skipped": False, "page_id": page_id, "url": url, "title": title}
 
 
 def _extract_first_email(header_val: str) -> str:
@@ -361,70 +468,18 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    notion_api_key = _require_env("NOTION_API_KEY")
-    database_id = _require_env("NOTION_DATABASE_ID")
     gmail_user = os.environ.get("GMAIL_USER", "").strip()
     gmail_app_password = os.environ.get("GMAIL_APP_PASSWORD", "").strip()
 
-    notion = Client(auth=notion_api_key)
-
-    db = notion.databases.retrieve(database_id=database_id)
-    if not isinstance(db, dict):
-        raise RuntimeError(f"Notion APIから想定外の応答を受け取りました: {type(db)}")
-
-    parent: dict
-    schema_source: dict = db
-    data_sources = db.get("data_sources") or []
-    if isinstance(data_sources, list) and data_sources and isinstance(data_sources[0], dict) and data_sources[0].get("id"):
-        data_source_id = str(data_sources[0]["id"])
-        schema_source = notion.data_sources.retrieve(data_source_id=data_source_id)
-        parent = {"data_source_id": data_source_id}
-    else:
-        parent = {"database_id": database_id}
-
-    if not isinstance(schema_source, dict):
-        raise RuntimeError(f"Notion APIから想定外の応答を受け取りました: {type(schema_source)}")
-
-    # DB６本タスク管理のスキーマに合わせて厳密に紐付け
-    _get_property(schema_source, PROP_TASK_NAME, "title")
-    _get_property(schema_source, PROP_DUE, "date")
-    _get_property(schema_source, PROP_LIFE_IDEA, "multi_select")
-    status_prop = _get_property(schema_source, PROP_STATUS, ("multi_select", "status"))
-
-    processed = _load_processed_ids()
-
     def upsert_one(*, title: str, source_id: str, body: str = "", due: date | None = None) -> None:
-        nonlocal processed
-        if source_id and source_id in processed:
-            print(f"SKIP: 既に処理済みです source_id={source_id!r}")
-            return
-        if args.dry_run:
-            print(f"DRYRUN: title={title!r} source_id={source_id!r} due={str(due) if due else ''}")
-            return
-
-        life_idea_value = LIFE_VALUE if due else IDEA_VALUE
-        props: dict = {
-            PROP_TASK_NAME: {"title": [{"type": "text", "text": {"content": title}}]},
-            PROP_LIFE_IDEA: {"multi_select": [{"name": life_idea_value}]},
-        }
-        if status_prop.get("type") == "status":
-            props[PROP_STATUS] = {"status": {"name": STATUS_TODO_VALUE}}
-        else:
-            props[PROP_STATUS] = {"multi_select": [{"name": STATUS_TODO_VALUE}]}
-        if due:
-            props[PROP_DUE] = {"date": {"start": due.isoformat()}}
-
-        page = notion.pages.create(
-            parent=parent,
-            properties=props,
+        register_notion_task(
+            title=title,
+            body=body,
+            due=due,
+            source_id=source_id,
+            dry_run=args.dry_run,
+            verbose=True,
         )
-        page_id = page.get("id", "")
-        url = page.get("url", "")
-        print(f"OK: Notionに1件追加しました title={title!r} id={page_id} url={url}")
-
-        if source_id:
-            processed.add(source_id)
-            _save_processed_ids(processed)
 
     if args.from_gmail:
         if not gmail_user or not gmail_app_password:

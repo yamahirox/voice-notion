@@ -1,0 +1,16 @@
+.git
+.gitignore
+venv
+.venv
+**/__pycache__
+*.pyc
+.env
+.env.*
+!.env.example
+.cursorignore
+certs
+docs
+tests
+src
+scripts
+*.md
