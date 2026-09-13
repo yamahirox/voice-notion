@@ -24,3 +24,8 @@ Thumbs.db
 
 # 開発用自己署名証明書
 certs/
+
+# 外出先トンネル
+tools/*.exe
+.remote_secret
+外出先のURL.txt

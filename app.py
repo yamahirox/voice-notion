@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import re
+import secrets
 import socket
 import ssl
 import subprocess
@@ -562,12 +563,86 @@ def _serve_public(ssl_ctx: ssl.SSLContext) -> None:
         threading.Thread(target=_handle_public_client, args=(client, ssl_ctx), daemon=True).start()
 
 
+def _want_remote_tunnel() -> bool:
+    return _env("VOICE_REMOTE") == "1"
+
+
+def _ensure_remote_secret() -> str:
+    existing = _env("VOICE_SHARED_SECRET")
+    if existing:
+        return existing
+    secret_file = Path(__file__).resolve().parent / ".remote_secret"
+    if secret_file.is_file():
+        stored = secret_file.read_text(encoding="utf-8").strip()
+        if stored:
+            os.environ["VOICE_SHARED_SECRET"] = stored
+            return stored
+    generated = secrets.token_urlsafe(18)
+    secret_file.write_text(generated + "\n", encoding="utf-8")
+    os.environ["VOICE_SHARED_SECRET"] = generated
+    return generated
+
+
+def _cloudflared_path() -> Path:
+    return Path(__file__).resolve().parent / "tools" / "cloudflared.exe"
+
+
+def _ensure_cloudflared() -> Path:
+    exe = _cloudflared_path()
+    if exe.is_file() and exe.stat().st_size > 1_000_000:
+        return exe
+    exe.parent.mkdir(parents=True, exist_ok=True)
+    url = "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"
+    logger.info("外出先用ツールをダウンロードしています…")
+    tmp = exe.with_suffix(".download")
+    try:
+        urllib.request.urlretrieve(url, tmp)
+        tmp.replace(exe)
+    except Exception:
+        if tmp.exists():
+            tmp.unlink()
+        raise RuntimeError("外出先用ツールのダウンロードに失敗しました。インターネット接続を確認してください。")
+    return exe
+
+
+def _start_cloudflare_tunnel() -> None:
+    exe = _ensure_cloudflared()
+    proc = subprocess.Popen(
+        [str(exe), "tunnel", "--url", f"http://127.0.0.1:{INTERNAL_FLASK_PORT}", "--no-autoupdate"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    url_re = re.compile(r"https://[a-z0-9-]+\.trycloudflare\.com")
+    url_file = Path(__file__).resolve().parent / "外出先のURL.txt"
+
+    def watch() -> None:
+        assert proc.stdout is not None
+        for line in proc.stdout:
+            match = url_re.search(line)
+            if not match:
+                continue
+            public_url = match.group(0)
+            url_file.write_text(public_url + "\n", encoding="utf-8")
+            logger.info("外出先のスマホ: %s", public_url)
+            logger.info("接続用パスワードは、この窓に表示した値を画面に保存してください")
+
+    threading.Thread(target=watch, daemon=True).start()
+
+
 def main() -> None:
     if _is_cloud():
         port = int(_env("PORT") or "8080")
         logger.info("クラウド公開モード http://0.0.0.0:%s （HTTPS はホスト側が担当）", port)
         app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
         return
+
+    if _want_remote_tunnel():
+        remote_secret = _ensure_remote_secret()
+        logger.info("接続用パスワード: %s", remote_secret)
+        logger.info("このパスワードは家のパソコンにだけ保存します。スマホの画面にも同じ値を入れてください。")
 
     lan = _lan_ipv4()
     ssl_ctx = _make_ssl_context()
@@ -581,8 +656,14 @@ def main() -> None:
         daemon=True,
     ).start()
     time.sleep(0.4)
+    if _want_remote_tunnel():
+        try:
+            _start_cloudflare_tunnel()
+        except Exception as exc:
+            logger.error("%s", exc)
+            logger.info("家の中のスマホはこれまでどおり使えます")
     logger.info("PC: http://127.0.0.1:%s", PUBLIC_PORT)
-    logger.info("スマホ: http://%s:%s", lan, PUBLIC_PORT)
+    logger.info("家のスマホ: http://%s:%s", lan, PUBLIC_PORT)
     logger.info("音声入力: 同じアドレスで自動的に https へ切り替わります")
     _serve_public(ssl_ctx)
 

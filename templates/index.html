@@ -11,12 +11,12 @@
   <link rel="icon" href="{{ url_for('static', filename='icon.svg') }}" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon.svg') }}" />
   <title>音声入力 → Notion</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=9" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=10" />
 </head>
 <body>
   <main class="wrap">
     <h1>音声入力 → Notion</h1>
-    <p class="sub">スマホだけで話せます。パソコンの電源は不要です。</p>
+    <p class="sub">ボタンを押して話し、もう一度押すと文字になります。パソコンの電源は不要です。</p>
 
     <p id="phone-help" class="banner warn hidden" role="status"></p>
     <p id="homescreen-hint" class="banner hint-banner">Chrome のメニュー →「ホーム画面に追加」で、次からワンタップで開けます。</p>
@@ -43,6 +43,6 @@
 
     <p id="status" class="status" role="status" aria-live="polite"></p>
   </main>
-  <script src="{{ url_for('static', filename='app.js') }}?v=9"></script>
+  <script src="{{ url_for('static', filename='app.js') }}?v=10"></script>
 </body>
 </html>

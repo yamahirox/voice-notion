@@ -8,18 +8,18 @@
     → Notion API
 ```
 
-パソコンの電源は入りません。家にいなくても、スマホのブックマーク（またはホーム画面）から使います。
+パソコンの電源は入りません。家にいなくても、スマホのブックマーク（またはホーム画面）から使えます。
 
-## 0. スマホだけで使う（PC 不要・おすすめ）
+## 0. スマホだけで使う（外出先向け・おすすめ）
 
-家のパソコンを起動しておく必要はありません。アプリを **Render** または **Railway** に置き、発行された `https://…` をスマホで開きます。
+家のパソコンを起動しておく必要はありません。アプリを **Render** に置き、発行された `https://…` をスマホで開きます。
 
 ### 準備（最初の1回だけ）
 
-1. このフォルダの中身を **GitHub** に置きます（リポジトリ例: `voice-notion`）。`.env` は上げないでください。
-2. [Render](https://render.com/) か [Railway](https://railway.app/) でアカウントを作り、その GitHub リポジトリを選びます。
+1. このフォルダの中身は GitHub リポジトリ `yamahirox/voice-notion` に置いてあります。`.env` は上げないでください。
+2. [Render](https://render.com/) でアカウントを作り、その GitHub リポジトリを選びます。
 3. 作り方は **Docker**（このフォルダの `Dockerfile`）にします。
-4. サービスの **Environment / Variables** に次を入れます。
+4. サービスの **Environment Variables** に次を入れます。
 
 | 名前 | 内容 |
 | --- | --- |
@@ -27,26 +27,27 @@
 | `NOTION_DB_6PON_ID` | 「DB6本タスク管理」の Database ID |
 | `VOICE_SHARED_SECRET` | 自分だけが知る長いパスワード（推奨） |
 
-5. 公開が終わると `https://…….onrender.com` や `https://…….up.railway.app` のような URL が出ます。
+5. 公開が終わると `https://…….onrender.com` のような URL が出ます。
 6. スマホの Chrome でその URL を開き、画面の「接続用パスワード」に同じ値を保存します。
 7. 「🎤 音声入力開始」を押し、マイクを許可します。公開 URL は https なので、スマホの音声認識が使えます。
 8. Chrome のメニュー → **ホーム画面に追加** すると、次からアプリのように開けます。
 
 無料枠では、しばらく使わないと眠ることがあります。そのときは画面を開いて数十秒待つと起きます。
 
-### Render で公開するときの目安
+### 今開いている Render「New Web Service」画面の記入
 
-1. Dashboard → **New** → **Blueprint** または **Web Service**
-2. GitHub のこのリポジトリを選択
-3. Runtime が Docker なら、そのままで `Dockerfile` が使われます
-4. 上の環境変数を入れて Deploy
+| 項目 | 入れる値 |
+| --- | --- |
+| Source Code | GitHub の `yamahirox/voice-notion` |
+| Name | `voice-notion` |
+| Language | `Docker`（Python ではない） |
+| Branch | `main` |
+| Region | `Singapore`（なければそのまま） |
+| Root Directory | 空のまま |
+| Instance Type | `Free`（$0、カード登録なし） |
+| Dockerfile Path | `./Dockerfile`（出ていればそのままでよい） |
 
-### Railway で公開するときの目安
-
-1. **New Project** → **Deploy from GitHub repo**
-2. このリポジトリを選び、Docker でビルドされることを確認
-3. **Variables** に上の環境変数を入れる
-4. 発行された公開 URL をスマホで開く
+Environment Variables に、上の3つを入れてから一番下の **Deploy Web Service** を押します。
 
 ---
 
@@ -158,7 +159,7 @@ New-NetFirewallRule -DisplayName "Flask Voice Notion 5000" -Direction Inbound -P
 - VPN を切っているか
 - アドレスが `http://` で、ポートが `:5000` か
 - アプリ起動中か（黒い窓を閉じると止まります）
-- 家の PC を使わずスマホだけで使うなら、この README 冒頭の **「0. スマホだけで使う」** を見てクラウドに置いてください
+- 外出先から使うなら、上の「0. スマホだけで使う」で出した Render の URL を開く
 
 ---
 

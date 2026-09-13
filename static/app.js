@@ -10,13 +10,6 @@
   const secretSaveBtn = document.getElementById("secret-save");
   const SECRET_KEY = "voiceSharedSecret";
 
-  function buildApiHeaders() {
-    const headers = { "Content-Type": "application/json" };
-    const secret = sessionStorage.getItem(SECRET_KEY);
-    if (secret) headers["X-Voice-Secret"] = secret;
-    return headers;
-  }
-
   const SpeechRecognition =
     window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -25,6 +18,31 @@
   let recognizing = false;
   let lastToggleAt = 0;
   let sessionBase = "";
+  let mediaRecorder = null;
+  let recordedChunks = [];
+  let mediaStream = null;
+  let recording = false;
+  let transcribing = false;
+
+  function isIOS() {
+    const ua = navigator.userAgent || "";
+    return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  }
+
+  function canUseBrowserSpeech() {
+    return Boolean(SpeechRecognition) && window.isSecureContext && !isIOS();
+  }
+
+  function secretHeaders() {
+    const headers = {};
+    const secret = sessionStorage.getItem(SECRET_KEY);
+    if (secret) headers["X-Voice-Secret"] = secret;
+    return headers;
+  }
+
+  function buildApiHeaders() {
+    return { "Content-Type": "application/json", ...secretHeaders() };
+  }
 
   function setStatus(message, kind) {
     statusEl.textContent = message;
@@ -32,8 +50,9 @@
     if (kind) statusEl.classList.add(kind);
   }
 
-  function setListeningUi(on) {
+  function setListeningUi(on, label) {
     recognizing = on;
+    listeningEl.textContent = label || "🎙 音声入力中…";
     listeningEl.classList.toggle("hidden", !on);
     micBtn.classList.toggle("listening", on);
     micBtn.setAttribute("aria-pressed", on ? "true" : "false");
@@ -100,11 +119,148 @@
     textarea.dataset.base = sessionBase;
   }
 
-  function goSecureAndStart() {
-    const url = new URL(location.href);
-    url.protocol = "https:";
-    url.searchParams.set("autostart", "1");
-    location.replace(url.toString());
+  function pickRecorderMime() {
+    const types = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/aac"];
+    if (!window.MediaRecorder) return "";
+    for (let i = 0; i < types.length; i += 1) {
+      if (MediaRecorder.isTypeSupported(types[i])) return types[i];
+    }
+    return "";
+  }
+
+  function recorderExtension(mime) {
+    if (mime.indexOf("mp4") !== -1) return ".mp4";
+    if (mime.indexOf("aac") !== -1) return ".aac";
+    if (mime.indexOf("mpeg") !== -1) return ".mp3";
+    return ".webm";
+  }
+
+  function stopMediaStream() {
+    if (!mediaStream) return;
+    mediaStream.getTracks().forEach((track) => {
+      try {
+        track.stop();
+      } catch (err) {
+        /* ignore */
+      }
+    });
+    mediaStream = null;
+  }
+
+  function startRecording() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
+      setStatus("❌ このブラウザでは音声入力できません。スマホの Chrome で開いてください。", "err");
+      return;
+    }
+    const mime = pickRecorderMime();
+    recordedChunks = [];
+    rememberSessionBase();
+    setStatus("マイクを準備しています…");
+    navigator.mediaDevices
+      .getUserMedia({ audio: true })
+      .then((stream) => {
+        mediaStream = stream;
+        const options = mime ? { mimeType: mime } : {};
+        mediaRecorder = mime ? new MediaRecorder(stream, options) : new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data && event.data.size) recordedChunks.push(event.data);
+        };
+        mediaRecorder.onerror = () => {
+          recording = false;
+          stopMediaStream();
+          setListeningUi(false);
+          setStatus("❌ 録音でエラーが発生しました", "err");
+        };
+        mediaRecorder.onstop = () => {
+          stopMediaStream();
+          uploadRecording(mediaRecorder.mimeType || mime || "audio/webm");
+        };
+        recording = true;
+        mediaRecorder.start();
+        setListeningUi(true, "🎙 録音中… 話し終わったらもう一度ボタンを押してください");
+        setStatus("");
+      })
+      .catch((err) => {
+        recording = false;
+        setListeningUi(false);
+        const name = err && err.name ? err.name : "";
+        if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+          setStatus("❌ マイクを許可してください。", "err");
+          return;
+        }
+        setStatus("❌ スマホの音声認識を開始できません。マイク許可を確認してください。", "err");
+      });
+  }
+
+  function stopRecording() {
+    if (!mediaRecorder || mediaRecorder.state === "inactive") {
+      recording = false;
+      stopMediaStream();
+      setListeningUi(false);
+      return;
+    }
+    try {
+      mediaRecorder.stop();
+    } catch (err) {
+      recording = false;
+      stopMediaStream();
+      setListeningUi(false);
+    }
+  }
+
+  function uploadRecording(mime) {
+    recording = false;
+    const blob = new Blob(recordedChunks, { type: mime || "audio/webm" });
+    recordedChunks = [];
+    if (!blob.size) {
+      setListeningUi(false);
+      setStatus("❌ 声を認識できませんでした。もう一度話してください。", "err");
+      return;
+    }
+    transcribing = true;
+    setListeningUi(true, "🎙 文字にしています…");
+    setStatus("音声を文字にしています…");
+    const body = new FormData();
+    body.append("audio", blob, `voice${recorderExtension(mime)}`);
+    fetch("/api/speech-to-text", {
+      method: "POST",
+      headers: secretHeaders(),
+      body,
+    })
+      .then(async (res) => {
+        let data = {};
+        try {
+          data = await res.json();
+        } catch (e) {
+          data = {};
+        }
+        if (res.status === 401) {
+          if (secretBox) {
+            secretBox.classList.remove("hidden");
+            secretBox.open = true;
+          }
+          setStatus("❌ 接続用パスワードを保存してから、もう一度話してください", "err");
+          return;
+        }
+        if (res.ok && data.ok && data.text) {
+          writeHeardText(data.text);
+          rememberSessionBase();
+          setStatus("✅ 文字にしました。内容を確認して Notionに登録 を押してください", "ok");
+          return;
+        }
+        if (data.error === "empty_transcript") {
+          setStatus("❌ 声を認識できませんでした。もう一度、はっきり話してください。", "err");
+          return;
+        }
+        setStatus("❌ 音声を文字にできませんでした。もう一度試してください。", "err");
+      })
+      .catch(() => {
+        setStatus("❌ 通信に失敗しました。電波を確認してもう一度試してください。", "err");
+      })
+      .finally(() => {
+        transcribing = false;
+        setListeningUi(false);
+      });
   }
 
   function bindRecognition(instance) {
@@ -132,6 +288,12 @@
       if (event.error === "aborted") {
         return;
       }
+      if (event.error === "network") {
+        wantListen = false;
+        setListeningUi(false);
+        startRecording();
+        return;
+      }
       if (event.error !== "no-speech") {
         setStatus("❌ 音声認識でエラーが発生しました", "err");
       }
@@ -153,6 +315,7 @@
         } catch (err) {
           wantListen = false;
           setListeningUi(false);
+          startRecording();
         }
       }, 120);
     };
@@ -165,10 +328,6 @@
   }
 
   function startLiveSpeech() {
-    if (!SpeechRecognition) {
-      setStatus("❌ このブラウザでは自動音声入力を利用できません。", "err");
-      return;
-    }
     setStatus("");
     rememberSessionBase();
     wantListen = true;
@@ -181,12 +340,16 @@
     } catch (err) {
       wantListen = false;
       setListeningUi(false);
-      setStatus("❌ 音声認識を開始できませんでした", "err");
+      startRecording();
     }
   }
 
   function stopVoiceInput() {
     wantListen = false;
+    if (recording) {
+      stopRecording();
+      return;
+    }
     setListeningUi(false);
     if (recognition) {
       try {
@@ -203,16 +366,18 @@
       return;
     }
     lastToggleAt = now;
-    if (wantListen || recognizing) {
+    if (transcribing) {
+      return;
+    }
+    if (wantListen || recognizing || recording) {
       stopVoiceInput();
       return;
     }
-    if (!window.isSecureContext) {
-      setStatus("音声入力を開始します…");
-      goSecureAndStart();
+    if (canUseBrowserSpeech()) {
+      startLiveSpeech();
       return;
     }
-    startLiveSpeech();
+    startRecording();
   }
 
   if (phoneHelp) {
@@ -237,23 +402,10 @@
     })
     .catch(() => {});
 
-  const autostart = new URLSearchParams(location.search).get("autostart") === "1";
-  if (autostart && window.isSecureContext && SpeechRecognition) {
-    window.setTimeout(startLiveSpeech, 250);
-  }
-
   micBtn.addEventListener("click", (event) => {
     event.preventDefault();
     toggleVoiceInput();
   });
-  micBtn.addEventListener(
-    "touchend",
-    (event) => {
-      event.preventDefault();
-      toggleVoiceInput();
-    },
-    { passive: false }
-  );
 
   submitBtn.addEventListener("click", async () => {
     const text = (textarea.value || "").trim();
@@ -280,11 +432,6 @@
         setStatus("✅ Notionに登録しました", "ok");
         textarea.value = "";
         delete textarea.dataset.base;
-        const url = new URL(location.href);
-        if (url.searchParams.has("autostart")) {
-          url.searchParams.delete("autostart");
-          history.replaceState({}, "", url.toString());
-        }
       } else if (res.status === 401) {
         if (secretBox) secretBox.classList.remove("hidden");
         setStatus("❌ 接続用パスワードを保存してから、もう一度登録してください", "err");
