@@ -6,9 +6,13 @@
   const submitBtn = document.getElementById("submit-btn");
   const statusEl = document.getElementById("status");
   const secretBox = document.getElementById("secret-box");
+  const secretForm = document.getElementById("secret-form");
+  const secretSavedEl = document.getElementById("secret-saved");
+  const secretChangeBtn = document.getElementById("secret-change");
   const remoteSecretEl = document.getElementById("remote-secret");
   const secretSaveBtn = document.getElementById("secret-save");
   const SECRET_KEY = "voiceSharedSecret";
+  const COOKIE_KEY = "vn_secret";
 
   const SpeechRecognition =
     window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -33,22 +37,79 @@
     return Boolean(SpeechRecognition) && window.isSecureContext && !isIOS();
   }
 
+  function cookieSecret() {
+    const parts = document.cookie ? document.cookie.split(";") : [];
+    for (let i = 0; i < parts.length; i += 1) {
+      const piece = parts[i].trim();
+      const eq = piece.indexOf("=");
+      if (eq === -1) continue;
+      if (piece.slice(0, eq) === COOKIE_KEY) {
+        try {
+          return decodeURIComponent(piece.slice(eq + 1));
+        } catch (err) {
+          return "";
+        }
+      }
+    }
+    return "";
+  }
+
+  function writeCookieSecret(value) {
+    const secure = location.protocol === "https:" ? "; Secure" : "";
+    if (!value) {
+      document.cookie = COOKIE_KEY + "=; Max-Age=0; Path=/" + secure + "; SameSite=Lax";
+      return;
+    }
+    document.cookie =
+      COOKIE_KEY + "=" + encodeURIComponent(value) + "; Max-Age=31536000; Path=/" + secure + "; SameSite=Lax";
+  }
+
+  function storageGet() {
+    try {
+      return localStorage.getItem(SECRET_KEY) || "";
+    } catch (err) {
+      return "";
+    }
+  }
+
+  function storageSet(value) {
+    try {
+      if (value) localStorage.setItem(SECRET_KEY, value);
+      else localStorage.removeItem(SECRET_KEY);
+    } catch (err) {
+      /* Android の制限で localStorage が使えないことがある */
+    }
+  }
+
   function readSecret() {
-    const stored = localStorage.getItem(SECRET_KEY);
+    const stored = storageGet();
     if (stored) return stored;
-    const legacy = sessionStorage.getItem(SECRET_KEY);
-    if (legacy) {
-      localStorage.setItem(SECRET_KEY, legacy);
-      sessionStorage.removeItem(SECRET_KEY);
-      return legacy;
+    const fromCookie = cookieSecret();
+    if (fromCookie) {
+      storageSet(fromCookie);
+      return fromCookie;
+    }
+    try {
+      const legacy = sessionStorage.getItem(SECRET_KEY);
+      if (legacy) {
+        writeSecret(legacy);
+        sessionStorage.removeItem(SECRET_KEY);
+        return legacy;
+      }
+    } catch (err) {
+      /* ignore */
     }
     return "";
   }
 
   function writeSecret(value) {
-    if (value) localStorage.setItem(SECRET_KEY, value);
-    else localStorage.removeItem(SECRET_KEY);
-    sessionStorage.removeItem(SECRET_KEY);
+    storageSet(value);
+    writeCookieSecret(value);
+    try {
+      sessionStorage.removeItem(SECRET_KEY);
+    } catch (err) {
+      /* ignore */
+    }
   }
 
   function secretHeaders() {
@@ -61,11 +122,9 @@
   function refreshSecretBox() {
     if (!secretBox) return;
     const saved = Boolean(readSecret());
-    const summary = secretBox.querySelector("summary");
-    if (summary) {
-      summary.textContent = saved ? "接続用パスワード（この端末に保存済み）" : "接続用パスワード";
-    }
-    secretBox.open = !saved;
+    if (secretSavedEl) secretSavedEl.classList.toggle("hidden", !saved);
+    if (secretForm) secretForm.classList.toggle("hidden", saved);
+    if (secretChangeBtn) secretChangeBtn.classList.toggle("hidden", !saved);
   }
 
   function buildApiHeaders() {
@@ -414,10 +473,34 @@
 
   secretSaveBtn?.addEventListener("click", () => {
     const value = (remoteSecretEl && remoteSecretEl.value ? remoteSecretEl.value : "").trim();
+    if (!value) {
+      setStatus("❌ パスワードを入力してから保存してください", "err");
+      return;
+    }
     writeSecret(value);
-    if (remoteSecretEl) remoteSecretEl.value = "";
-    refreshSecretBox();
-    setStatus(value ? "✅ この端末にパスワードを保存しました。次回から入力は不要です" : "パスワードを消しました", value ? "ok" : "");
+    fetch("/api/auth-check", { headers: secretHeaders() })
+      .then((res) => {
+        if (res.status === 401) {
+          writeSecret("");
+          refreshSecretBox();
+          setStatus("❌ パスワードが違います。Render に入れた値をもう一度入れてください", "err");
+          return;
+        }
+        if (remoteSecretEl) remoteSecretEl.value = "";
+        refreshSecretBox();
+        setStatus("✅ このスマホに保存しました。次回から入力は不要です", "ok");
+      })
+      .catch(() => {
+        refreshSecretBox();
+        setStatus("✅ このスマホに保存しました。次回から入力は不要です", "ok");
+      });
+  });
+
+  secretChangeBtn?.addEventListener("click", () => {
+    if (secretForm) secretForm.classList.remove("hidden");
+    if (secretSavedEl) secretSavedEl.classList.add("hidden");
+    secretChangeBtn.classList.add("hidden");
+    if (remoteSecretEl) remoteSecretEl.focus();
   });
 
   refreshSecretBox();

@@ -315,6 +315,14 @@ def api_config():
     )
 
 
+@app.get("/api/auth-check")
+def auth_check():
+    denied = _reject_unless_secret()
+    if denied:
+        return denied
+    return jsonify({"ok": True})
+
+
 @app.get("/manifest.webmanifest")
 def manifest():
     static_dir = Path(__file__).resolve().parent / "static"

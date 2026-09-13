@@ -156,9 +156,14 @@ textarea:focus {
   border: 1px solid #d1d5db;
 }
 
-.secret-box summary {
-  cursor: pointer;
+.secret-title {
+  margin: 0;
   font-weight: 700;
+}
+
+.secret-saved {
+  background: #d1fae5;
+  color: #065f46;
 }
 
 .secret-help {
