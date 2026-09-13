@@ -188,3 +188,7 @@ textarea:focus {
   background: #4b5563;
   color: #fff;
 }
+
+.btn-secret-change {
+  margin-top: 1.5rem;
+}

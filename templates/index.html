@@ -11,7 +11,7 @@
   <link rel="icon" href="{{ url_for('static', filename='icon.svg') }}" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon.svg') }}" />
   <title>音声入力 → Notion</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=13" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=14" />
 </head>
 <body>
   <main class="wrap">
@@ -19,11 +19,9 @@
     <p class="sub">ボタンを押して話し、もう一度押すと文字になります。パソコンの電源は不要です。</p>
 
     <p id="phone-help" class="banner warn hidden" role="status"></p>
-    <p id="homescreen-hint" class="banner hint-banner">パスワードは一度保存すれば、このスマホでは次回から不要です。ホーム画面のアイコンは、同じページを開く近道です。</p>
 
     {% if secret_required %}
     <section id="secret-box" class="secret-box">
-      <p id="secret-saved" class="banner secret-saved hidden">このスマホに保存済みです。次回から入力は不要です。</p>
       <div id="secret-form">
         <p class="secret-title">接続用パスワード</p>
         <p class="secret-help">Render の Environment に入れたパスワードを、ここに一度だけ保存します。</p>
@@ -31,7 +29,6 @@
         <input id="remote-secret" type="password" name="voice-shared-secret" autocomplete="off" />
         <button id="secret-save" type="button" class="btn btn-secondary">この端末に保存</button>
       </div>
-      <button id="secret-change" type="button" class="btn btn-secondary hidden">パスワードをやり直す</button>
     </section>
     {% endif %}
 
@@ -41,12 +38,16 @@
     <p id="listening" class="listening hidden" aria-live="polite">🎙 音声入力中…</p>
 
     <label class="label" for="transcript">認識した内容</label>
-    <textarea id="transcript" rows="8" placeholder="例：明日の午前中に牛舎の薬品在庫を確認する"></textarea>
+    <textarea id="transcript" rows="8" lang="ja-JP" inputmode="text" autocomplete="off"></textarea>
 
     <button id="submit-btn" type="button" class="btn btn-submit">Notionに登録</button>
 
     <p id="status" class="status" role="status" aria-live="polite"></p>
+
+    {% if secret_required %}
+    <button id="secret-change" type="button" class="btn btn-secondary btn-secret-change hidden">パスワードをやり直す</button>
+    {% endif %}
   </main>
-  <script src="{{ url_for('static', filename='app.js') }}?v=13"></script>
+  <script src="{{ url_for('static', filename='app.js') }}?v=14"></script>
 </body>
 </html>

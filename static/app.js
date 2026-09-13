@@ -124,6 +124,7 @@
     const saved = Boolean(readSecret());
     if (secretSavedEl) secretSavedEl.classList.toggle("hidden", !saved);
     if (secretForm) secretForm.classList.toggle("hidden", saved);
+    secretBox.classList.toggle("hidden", saved);
     if (secretChangeBtn) secretChangeBtn.classList.toggle("hidden", !saved);
   }
 
@@ -350,6 +351,16 @@
       });
   }
 
+  function focusTranscript() {
+    textarea.focus();
+    const len = textarea.value.length;
+    try {
+      textarea.setSelectionRange(len, len);
+    } catch (err) {
+      /* some browsers reject setSelectionRange on an empty field */
+    }
+  }
+
   function bindRecognition(instance) {
     instance.lang = "ja-JP";
     instance.interimResults = true;
@@ -419,10 +430,15 @@
     rememberSessionBase();
     wantListen = true;
     setListeningUi(true);
+    focusTranscript();
     try {
       if (!recognition) {
         recognition = createRecognition();
       }
+      recognition.lang = "ja-JP";
+      recognition.interimResults = true;
+      recognition.continuous = true;
+      recognition.maxAlternatives = 1;
       recognition.start();
     } catch (err) {
       wantListen = false;
@@ -497,6 +513,7 @@
   });
 
   secretChangeBtn?.addEventListener("click", () => {
+    if (secretBox) secretBox.classList.remove("hidden");
     if (secretForm) secretForm.classList.remove("hidden");
     if (secretSavedEl) secretSavedEl.classList.add("hidden");
     secretChangeBtn.classList.add("hidden");
@@ -517,6 +534,7 @@
 
   micBtn.addEventListener("click", (event) => {
     event.preventDefault();
+    focusTranscript();
     toggleVoiceInput();
   });
 
